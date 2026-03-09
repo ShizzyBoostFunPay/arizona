@@ -23,12 +23,10 @@
             z-index: -1;
             background: linear-gradient(135deg, #f5f7fa 0%, #e9ecf0 100%);
         }
-        /* Контент поверх фона */
         .content {
             position: relative;
             z-index: 1;
         }
-        /* Стили для карточек статистики */
         .stat-card {
             backdrop-filter: blur(10px);
             background: rgba(255, 255, 255, 0.85);
@@ -44,7 +42,8 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='80' font-size='80' fill='%234f46e5'%3E🎮%3C/text%3E%3C/svg%3E">
 </head>
 <body class="font-sans antialiased">
-    <!-- Фон с частицами (светлый) -->
+
+    <!-- Фон с частицами -->
     <div id="particles-js"></div>
 
     <div class="container mx-auto px-4 py-8 max-w-6xl content">
@@ -79,11 +78,11 @@
                 <h2 class="text-xl font-semibold text-gray-800 mb-4">Вход для администратора</h2>
                 <div class="mb-4">
                     <label class="block text-gray-600 text-sm mb-1">Логин</label>
-                    <input type="text" id="loginUsername" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200" placeholder="Логин">
+                    <input type="text" id="loginUsername" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200" placeholder="FarlineNet">
                 </div>
                 <div class="mb-4">
                     <label class="block text-gray-600 text-sm mb-1">Пароль</label>
-                    <input type="password" id="loginPassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200" placeholder="Пароль">
+                    <input type="password" id="loginPassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200" placeholder="••••••••">
                 </div>
                 <div id="loginError" class="text-red-600 text-sm mb-3 hidden"></div>
                 <div class="flex justify-end gap-2">
@@ -283,8 +282,8 @@
             const ADMIN_LOGIN = 'FarlineNet';
             const ADMIN_PASSWORD = 'Krasav41k';
             
-            const defaultAccounts = [
-            ];
+            // Нет предустановленных аккаунтов — пустой массив по умолчанию
+            const defaultAccounts = [];  // <-- Убраны демо-аккаунты
 
             // --- Состояние ---
             let accounts = [];
@@ -365,10 +364,10 @@
                     try {
                         accounts = JSON.parse(stored);
                     } catch (e) {
-                        accounts = [...defaultAccounts];
+                        accounts = [...defaultAccounts]; // пустой массив
                     }
                 } else {
-                    accounts = [...defaultAccounts];
+                    accounts = [...defaultAccounts]; // пустой массив
                 }
                 accounts = accounts.map(a => ({ ...a, price: Number(a.price) }));
             }
@@ -377,15 +376,39 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
             }
 
+            // --- Функции для работы с GitHub ---
             async function fetchFromGitHub(token, repo, path) {
                 const url = `https://api.github.com/repos/${repo}/contents/${path}`;
                 const response = await fetch(url, {
                     headers: { 'Authorization': `token ${token}` }
                 });
+                if (response.status === 404) {
+                    throw new Error('NOT_FOUND');
+                }
                 if (!response.ok) throw new Error(`GitHub error: ${response.status}`);
                 const data = await response.json();
                 const content = atob(data.content);
                 return { accounts: JSON.parse(content), sha: data.sha };
+            }
+
+            async function createGitHubFile(token, repo, path, content = []) {
+                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+                const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
+                const body = {
+                    message: 'Initialize accounts file',
+                    content: contentEncoded
+                };
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) throw new Error(`GitHub create error: ${response.status}`);
+                const data = await response.json();
+                return { sha: data.content.sha };
             }
 
             async function saveToGitHub(accounts, token, repo, path, sha, message = 'Update accounts') {
@@ -406,6 +429,7 @@
                 return result;
             }
 
+            // --- Обновление статистики ---
             function updateStats() {
                 const total = accounts.length;
                 const available = accounts.filter(a => a.status === 'available').length;
@@ -440,12 +464,14 @@
                 }
             }
 
+            // --- Отрисовка таблицы ---
             function renderTable() {
                 let filtered = accounts;
                 if (currentFilter !== 'all') {
                     filtered = accounts.filter(a => a.status === currentFilter);
                 }
 
+                // Построение шапки
                 let headerHtml = '';
                 if (isAdmin) {
                     headerHtml = `
@@ -529,6 +555,7 @@
                 updateStats();
             }
 
+            // --- Действия админа (глобально доступны) ---
             window.markAsSold = async function(id) {
                 if (!isAdmin) return;
                 const account = accounts.find(a => a.id === id);
@@ -579,6 +606,7 @@
             }
             window.cancelEdit = cancelEdit;
 
+            // --- Обработка формы ---
             form.addEventListener('submit', async function(e) {
                 e.preventDefault();
                 if (!isAdmin) return;
@@ -610,10 +638,12 @@
                 cancelEdit();
             });
 
+            // --- Синхронизация с GitHub (отправка текущих accounts) ---
             async function syncWithGitHub() {
                 if (!isAdmin || !githubToken || !githubRepo || !githubPath) return;
                 try {
                     if (!currentSha) {
+                        // Если нет SHA, пытаемся получить его (файл должен существовать)
                         const { sha } = await fetchFromGitHub(githubToken, githubRepo, githubPath);
                         currentSha = sha;
                     }
@@ -625,6 +655,7 @@
                 }
             }
 
+            // --- Подключение к GitHub (загрузка или создание файла) ---
             async function connectGitHub() {
                 const token = tokenInput.value.trim();
                 const repo = repoInput.value.trim();
@@ -640,7 +671,23 @@
                 githubError.classList.add('hidden');
 
                 try {
-                    const { accounts: remoteAccounts, sha } = await fetchFromGitHub(token, repo, path);
+                    let remoteAccounts, sha;
+                    try {
+                        // Пробуем загрузить существующий файл
+                        const result = await fetchFromGitHub(token, repo, path);
+                        remoteAccounts = result.accounts;
+                        sha = result.sha;
+                    } catch (err) {
+                        if (err.message === 'NOT_FOUND') {
+                            // Файл не найден - создаём новый
+                            const createResult = await createGitHubFile(token, repo, path, []);
+                            sha = createResult.sha;
+                            remoteAccounts = []; // пустой массив
+                        } else {
+                            throw err; // другая ошибка
+                        }
+                    }
+
                     accounts = remoteAccounts.map(a => ({ ...a, price: Number(a.price) }));
                     saveToLocal();
 
@@ -666,6 +713,7 @@
                 }
             }
 
+            // --- Вход по логину/паролю ---
             function openLoginModal() {
                 loginModal.classList.remove('hidden');
                 loginUsername.value = '';
@@ -681,6 +729,7 @@
                 const username = loginUsername.value.trim();
                 const password = loginPassword.value.trim();
                 if (username === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+                    // Успешный вход
                     isAdmin = true;
                     adminIndicator.classList.remove('hidden');
                     logoutBtn.classList.remove('hidden');
@@ -688,6 +737,7 @@
                     githubSetupBlock.classList.remove('hidden');
                     toggleAdminStats(true);
                     
+                    // Если ранее были сохранены данные GitHub, можно попытаться восстановить
                     const savedToken = sessionStorage.getItem('githubToken');
                     const savedRepo = sessionStorage.getItem('githubRepo');
                     const savedPath = sessionStorage.getItem('githubPath');
@@ -700,9 +750,9 @@
                         tokenInput.value = savedToken;
                         repoInput.value = savedRepo;
                         pathInput.value = savedPath;
-                        connectGitHub();
+                        connectGitHub(); // загрузит данные с GitHub
                     } else {
-                        loadFromLocal();
+                        // Показываем пустую таблицу (локальные данные, которых нет)
                         renderTable();
                     }
                     closeLoginModalFunc();
@@ -712,6 +762,7 @@
                 }
             }
 
+            // --- Выход ---
             function logout() {
                 isAdmin = false;
                 githubToken = '';
@@ -726,11 +777,13 @@
                 adminFormBlock.classList.add('hidden');
                 syncBlock.classList.add('hidden');
                 toggleAdminStats(false);
+                // Загружаем локальные данные (пусто)
                 loadFromLocal();
                 renderTable();
                 cancelEdit();
             }
 
+            // --- Принудительная синхронизация (загрузить с GitHub) ---
             async function manualSync() {
                 if (!isAdmin) return;
                 try {
@@ -745,6 +798,7 @@
                 }
             }
 
+            // --- Обработчики событий ---
             loginBtn.addEventListener('click', openLoginModal);
             closeLoginModal.addEventListener('click', closeLoginModalFunc);
             submitLogin.addEventListener('click', submitLoginHandler);
@@ -756,10 +810,12 @@
             connectGitHubBtn.addEventListener('click', connectGitHub);
             syncBtn.addEventListener('click', manualSync);
 
+            // Фильтры
             filterButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const filter = this.dataset.filter;
                     currentFilter = filter;
+
                     filterButtons.forEach(b => {
                         if (b.dataset.filter === currentFilter) {
                             b.classList.remove('bg-white', 'text-gray-700', 'border', 'hover:bg-gray-100');
@@ -769,15 +825,16 @@
                             b.classList.add('bg-white', 'text-gray-700', 'border', 'hover:bg-gray-100');
                         }
                     });
+
                     renderTable();
                 });
             });
 
-            // Инициализация particles.js (светлый фон, тёмные частицы)
+            // --- Инициализация particles.js (светлый фон, тёмные частицы) ---
             particlesJS('particles-js', {
                 particles: {
                     number: { value: 80, density: { enable: true, value_area: 800 } },
-                    color: { value: '#2c3e50' }, // тёмно-серый/синий
+                    color: { value: '#2c3e50' },
                     shape: { type: 'circle' },
                     opacity: { value: 0.3, random: true },
                     size: { value: 3, random: true },
@@ -794,8 +851,9 @@
                 retina_detect: true
             });
 
+            // --- Инициализация при загрузке ---
             function init() {
-                loadFromLocal();
+                loadFromLocal();  // загрузит пустой массив
                 renderTable();
                 toggleAdminStats(false);
             }
