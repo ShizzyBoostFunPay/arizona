@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arizona RP | Управление продажами</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Particles.js -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <style>
+        .status-badge { @apply px-2 py-1 rounded-full text-xs font-semibold; }
+        .hidden { display: none !important; }
+        /* Анимированный фон (светлый) */
+        #particles-js {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecf0 100%);
+        }
+        /* Контент поверх фона */
+        .content {
+            position: relative;
+            z-index: 1;
+        }
+        /* Стили для карточек статистики */
+        .stat-card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.85);
+            transition: transform 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+    </style>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='10' y='80' font-size='80' fill='%234f46e5'%3E🎮%3C/text%3E%3C/svg%3E">
+</head>
+<body class="font-sans antialiased">
+    <!-- Фон с частицами (светлый) -->
+    <div id="particles-js"></div>
+
+    <div class="container mx-auto px-4 py-8 max-w-6xl content">
+
+        <!-- Шапка -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fas fa-gamepad text-indigo-600"></i>
+                    Arizona RP <span class="text-indigo-600">GTA:SA</span>
+                </h1>
+                <p class="text-gray-600 mt-1">Продажа аккаунтов для FunPay</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Индикатор режима -->
+                <div id="adminIndicator" class="hidden bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                    <i class="fas fa-crown"></i> Администратор
+                </div>
+                <!-- Кнопка входа / выхода -->
+                <button id="loginBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    <i class="fas fa-sign-in-alt"></i> Вход для администратора
+                </button>
+                <button id="logoutBtn" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg text-sm font-medium">
+                    <i class="fas fa-sign-out-alt"></i> Выйти
+                </button>
+            </div>
+        </div>
+
+        <!-- Модальное окно входа (логин/пароль) -->
+        <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="bg-white rounded-xl shadow-xl p-6 w-96">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Вход для администратора</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-600 text-sm mb-1">Логин</label>
+                    <input type="text" id="loginUsername" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200" placeholder="Логин">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-600 text-sm mb-1">Пароль</label>
+                    <input type="password" id="loginPassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200" placeholder="Пароль">
+                </div>
+                <div id="loginError" class="text-red-600 text-sm mb-3 hidden"></div>
+                <div class="flex justify-end gap-2">
+                    <button id="closeLoginModal" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg">Отмена</button>
+                    <button id="submitLogin" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">Войти</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Блок настройки GitHub (показывается только администратору) -->
+        <div id="githubSetupBlock" class="hidden bg-white rounded-xl shadow-md p-6 mb-8 bg-opacity-90 backdrop-blur-sm">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fab fa-github"></i> Подключение к GitHub
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Токен GitHub</label>
+                    <input type="password" id="githubToken" placeholder="ghp_..." 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Репозиторий</label>
+                    <input type="text" id="githubRepo" placeholder="user/repo" value="yourusername/arizona-accounts"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Путь к файлу</label>
+                    <input type="text" id="githubPath" placeholder="accounts.json" value="accounts.json"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div class="flex items-end">
+                    <button id="connectGitHubBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2">
+                        <i class="fas fa-plug"></i> Подключиться
+                    </button>
+                </div>
+            </div>
+            <div id="githubError" class="text-red-600 text-sm mt-2 hidden"></div>
+            <p class="text-xs text-gray-400 mt-3">
+                <i class="fas fa-info-circle"></i> Токен должен иметь права на чтение и запись содержимого репозитория. Он хранится только в памяти браузера.
+            </p>
+        </div>
+
+        <!-- Кнопка синхронизации (только для админа) -->
+        <div id="syncBlock" class="hidden mb-4 flex justify-end">
+            <button id="syncBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                <i class="fas fa-sync-alt"></i> Синхронизировать с GitHub
+            </button>
+        </div>
+
+        <!-- Карточки статистики (для гостя видны только первые три) -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <!-- Публичные карточки (видны всем) -->
+            <div class="stat-card bg-white rounded-xl shadow p-5 flex items-center">
+                <div class="rounded-full bg-indigo-100 p-3 mr-4">
+                    <i class="fas fa-boxes text-indigo-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Всего аккаунтов</p>
+                    <p class="text-2xl font-bold" id="totalAccounts">0</p>
+                </div>
+            </div>
+            <div class="stat-card bg-white rounded-xl shadow p-5 flex items-center">
+                <div class="rounded-full bg-green-100 p-3 mr-4">
+                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Доступно</p>
+                    <p class="text-2xl font-bold" id="availableAccounts">0</p>
+                </div>
+            </div>
+            <div class="stat-card bg-white rounded-xl shadow p-5 flex items-center">
+                <div class="rounded-full bg-yellow-100 p-3 mr-4">
+                    <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Зарезервировано</p>
+                    <p class="text-2xl font-bold" id="reservedAccounts">0</p>
+                </div>
+            </div>
+
+            <!-- Приватные карточки (видны только администратору) -->
+            <div id="revenueSoldCard" class="stat-card bg-white rounded-xl shadow p-5 flex items-center hidden">
+                <div class="rounded-full bg-blue-100 p-3 mr-4">
+                    <i class="fas fa-dollar-sign text-blue-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Выручка (проданные)</p>
+                    <p class="text-2xl font-bold" id="revenueSold">0 ₽</p>
+                </div>
+            </div>
+            <div id="revenueNotSoldCard" class="stat-card bg-white rounded-xl shadow p-5 flex items-center hidden">
+                <div class="rounded-full bg-orange-100 p-3 mr-4">
+                    <i class="fas fa-hourglass-half text-orange-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Выручка (не проданные)</p>
+                    <p class="text-2xl font-bold" id="revenueNotSold">0 ₽</p>
+                </div>
+            </div>
+            <div id="revenueTotalCard" class="stat-card bg-white rounded-xl shadow p-5 flex items-center hidden">
+                <div class="rounded-full bg-purple-100 p-3 mr-4">
+                    <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-gray-500 text-sm">Выручка (все)</p>
+                    <p class="text-2xl font-bold" id="revenueTotal">0 ₽</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Форма добавления / редактирования (только для админа) -->
+        <div id="adminFormBlock" class="hidden bg-white rounded-xl shadow-md p-6 mb-8 bg-opacity-90 backdrop-blur-sm">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-plus-circle text-indigo-600"></i>
+                <span id="formTitle">Добавить новый аккаунт</span>
+            </h2>
+            <form id="accountForm" class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <input type="hidden" id="editId" value="">
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Логин</label>
+                    <input type="text" id="username" placeholder="ник" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Пароль</label>
+                    <input type="text" id="password" placeholder="****" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Уровень / Данные</label>
+                    <input type="text" id="level" placeholder="10 lvl, 1.2M"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Цена (₽)</label>
+                    <input type="number" id="price" placeholder="299" step="1" min="0" required
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-sm mb-1">Статус</label>
+                    <select id="status"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
+                        <option value="available">Доступен</option>
+                        <option value="reserved">Зарезервирован</option>
+                        <option value="sold">Продан</option>
+                    </select>
+                </div>
+                <div class="flex items-end gap-2">
+                    <button type="submit" id="submitBtn"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium flex items-center gap-2">
+                        <i class="fas fa-save"></i> <span>Сохранить</span>
+                    </button>
+                    <button type="button" id="cancelEditBtn"
+                            class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg font-medium hidden items-center gap-2">
+                        <i class="fas fa-times"></i> Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Фильтры (видны всем) -->
+        <div class="flex flex-wrap gap-2 mb-4">
+            <button data-filter="all" class="filter-btn bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">Все</button>
+            <button data-filter="available" class="filter-btn bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100">Доступные</button>
+            <button data-filter="reserved" class="filter-btn bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100">Зарезервированные</button>
+            <button data-filter="sold" class="filter-btn bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100">Проданные</button>
+        </div>
+
+        <!-- Таблица аккаунтов -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden bg-opacity-90 backdrop-blur-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                        <tr id="tableHeader">
+                            <!-- шапка будет перестраиваться в зависимости от режима -->
+                        </tr>
+                    </thead>
+                    <tbody id="accountsTableBody" class="divide-y"></tbody>
+                </table>
+                <div id="emptyMessage" class="text-center py-10 text-gray-500 hidden">
+                    <i class="fas fa-folder-open text-4xl mb-2"></i>
+                    <p>Нет аккаунтов для отображения</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Подсказка -->
+        <div class="mt-6 text-xs text-gray-400 text-center">
+            <i class="fas fa-info-circle"></i> Данные синхронизируются с GitHub после подключения. Для гостя отображается только публичная информация.
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // --- Константы ---
+            const STORAGE_KEY = 'arizona_accounts';
+            const ADMIN_LOGIN = 'FarlineNet';
+            const ADMIN_PASSWORD = 'Krasav41k';
+            
+            const defaultAccounts = [
+                { id: '1', username: 'SpeedStar', password: 'pass123', level: '10 lvl, 1.2M', price: 450, status: 'available' },
+                { id: '2', username: 'Gangster777', password: 'qwerty', level: '25 lvl, VIP', price: 1200, status: 'sold' },
+                { id: '3', username: 'RacerX', password: 'secret', level: '5 lvl, 300k', price: 250, status: 'reserved' },
+                { id: '4', username: 'MafiaDon', password: 'don123', level: '40 lvl, 5M, house', price: 3000, status: 'available' },
+            ];
+
+            // --- Состояние ---
+            let accounts = [];
+            let currentFilter = 'all';
+            let editingId = null;
+            let isAdmin = false;
+            let githubToken = '';
+            let githubRepo = '';
+            let githubPath = '';
+            let currentSha = '';
+
+            // --- DOM элементы ---
+            const loginBtn = document.getElementById('loginBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const loginModal = document.getElementById('loginModal');
+            const closeLoginModal = document.getElementById('closeLoginModal');
+            const submitLogin = document.getElementById('submitLogin');
+            const loginUsername = document.getElementById('loginUsername');
+            const loginPassword = document.getElementById('loginPassword');
+            const loginError = document.getElementById('loginError');
+            
+            const githubSetupBlock = document.getElementById('githubSetupBlock');
+            const syncBlock = document.getElementById('syncBlock');
+            const adminFormBlock = document.getElementById('adminFormBlock');
+            const adminIndicator = document.getElementById('adminIndicator');
+            
+            const tokenInput = document.getElementById('githubToken');
+            const repoInput = document.getElementById('githubRepo');
+            const pathInput = document.getElementById('githubPath');
+            const connectGitHubBtn = document.getElementById('connectGitHubBtn');
+            const githubError = document.getElementById('githubError');
+            const syncBtn = document.getElementById('syncBtn');
+
+            // Элементы статистики
+            const totalSpan = document.getElementById('totalAccounts');
+            const availableSpan = document.getElementById('availableAccounts');
+            const reservedSpan = document.getElementById('reservedAccounts');
+            const revenueSoldSpan = document.getElementById('revenueSold');
+            const revenueNotSoldSpan = document.getElementById('revenueNotSold');
+            const revenueTotalSpan = document.getElementById('revenueTotal');
+            // Карточки для приватной статистики
+            const revenueSoldCard = document.getElementById('revenueSoldCard');
+            const revenueNotSoldCard = document.getElementById('revenueNotSoldCard');
+            const revenueTotalCard = document.getElementById('revenueTotalCard');
+
+            // Форма
+            const form = document.getElementById('accountForm');
+            const editIdInput = document.getElementById('editId');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const levelInput = document.getElementById('level');
+            const priceInput = document.getElementById('price');
+            const statusSelect = document.getElementById('status');
+            const submitBtn = document.getElementById('submitBtn');
+            const cancelEditBtn = document.getElementById('cancelEditBtn');
+            const formTitle = document.getElementById('formTitle');
+
+            // Таблица и фильтры
+            const tableHeader = document.getElementById('tableHeader');
+            const tbody = document.getElementById('accountsTableBody');
+            const emptyMessage = document.getElementById('emptyMessage');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+
+            // --- Вспомогательные функции ---
+            function escapeHtml(unsafe) {
+                if (!unsafe) return '';
+                return String(unsafe)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function loadFromLocal() {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                if (stored) {
+                    try {
+                        accounts = JSON.parse(stored);
+                    } catch (e) {
+                        accounts = [...defaultAccounts];
+                    }
+                } else {
+                    accounts = [...defaultAccounts];
+                }
+                accounts = accounts.map(a => ({ ...a, price: Number(a.price) }));
+            }
+
+            function saveToLocal() {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+            }
+
+            async function fetchFromGitHub(token, repo, path) {
+                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (!response.ok) throw new Error(`GitHub error: ${response.status}`);
+                const data = await response.json();
+                const content = atob(data.content);
+                return { accounts: JSON.parse(content), sha: data.sha };
+            }
+
+            async function saveToGitHub(accounts, token, repo, path, sha, message = 'Update accounts') {
+                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+                const content = btoa(unescape(encodeURIComponent(JSON.stringify(accounts, null, 2))));
+                const body = { message, content, sha };
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) throw new Error(`GitHub save error: ${response.status}`);
+                const result = await response.json();
+                currentSha = result.content.sha;
+                return result;
+            }
+
+            function updateStats() {
+                const total = accounts.length;
+                const available = accounts.filter(a => a.status === 'available').length;
+                const reserved = accounts.filter(a => a.status === 'reserved').length;
+                const sold = accounts.filter(a => a.status === 'sold');
+                const revenueSold = sold.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+                
+                const notSold = accounts.filter(a => a.status !== 'sold');
+                const revenueNotSold = notSold.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+                const revenueTotal = accounts.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+
+                totalSpan.textContent = total;
+                availableSpan.textContent = available;
+                reservedSpan.textContent = reserved;
+
+                if (isAdmin) {
+                    revenueSoldSpan.textContent = revenueSold + ' ₽';
+                    revenueNotSoldSpan.textContent = revenueNotSold + ' ₽';
+                    revenueTotalSpan.textContent = revenueTotal + ' ₽';
+                }
+            }
+
+            function toggleAdminStats(show) {
+                if (show) {
+                    revenueSoldCard.classList.remove('hidden');
+                    revenueNotSoldCard.classList.remove('hidden');
+                    revenueTotalCard.classList.remove('hidden');
+                } else {
+                    revenueSoldCard.classList.add('hidden');
+                    revenueNotSoldCard.classList.add('hidden');
+                    revenueTotalCard.classList.add('hidden');
+                }
+            }
+
+            function renderTable() {
+                let filtered = accounts;
+                if (currentFilter !== 'all') {
+                    filtered = accounts.filter(a => a.status === currentFilter);
+                }
+
+                let headerHtml = '';
+                if (isAdmin) {
+                    headerHtml = `
+                        <th class="px-6 py-3">ID</th>
+                        <th class="px-6 py-3">Логин</th>
+                        <th class="px-6 py-3">Пароль</th>
+                        <th class="px-6 py-3">Уровень/Данные</th>
+                        <th class="px-6 py-3">Цена</th>
+                        <th class="px-6 py-3">Статус</th>
+                        <th class="px-6 py-3">Действия</th>
+                    `;
+                } else {
+                    headerHtml = `
+                        <th class="px-6 py-3">#</th>
+                        <th class="px-6 py-3">Уровень/Данные</th>
+                        <th class="px-6 py-3">Цена</th>
+                        <th class="px-6 py-3">Статус</th>
+                    `;
+                }
+                tableHeader.innerHTML = headerHtml;
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyMessage.classList.remove('hidden');
+                    return;
+                }
+                emptyMessage.classList.add('hidden');
+
+                let rows = '';
+                filtered.forEach((acc, index) => {
+                    const statusText = {
+                        'available': 'Доступен',
+                        'reserved': 'Зарезервирован',
+                        'sold': 'Продан'
+                    }[acc.status] || acc.status;
+
+                    const statusColor = {
+                        'available': 'bg-green-100 text-green-800',
+                        'reserved': 'bg-yellow-100 text-yellow-800',
+                        'sold': 'bg-gray-100 text-gray-800'
+                    }[acc.status] || 'bg-gray-100';
+
+                    if (isAdmin) {
+                        rows += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-3 font-mono text-xs">${escapeHtml(acc.id)}</td>
+                                <td class="px-6 py-3 font-medium">${escapeHtml(acc.username)}</td>
+                                <td class="px-6 py-3">${escapeHtml(acc.password || '—')}</td>
+                                <td class="px-6 py-3">${escapeHtml(acc.level || '—')}</td>
+                                <td class="px-6 py-3 font-semibold">${acc.price} ₽</td>
+                                <td class="px-6 py-3"><span class="status-badge ${statusColor}">${statusText}</span></td>
+                                <td class="px-6 py-3">
+                                    <div class="flex items-center gap-2">
+                                        ${acc.status !== 'sold' ? `
+                                            <button onclick="markAsSold('${acc.id}')" class="text-green-600 hover:text-green-800" title="Отметить проданным">
+                                                <i class="fas fa-check-circle"></i>
+                                            </button>
+                                        ` : ''}
+                                        <button onclick="editAccount('${acc.id}')" class="text-blue-600 hover:text-blue-800" title="Редактировать">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button onclick="deleteAccount('${acc.id}')" class="text-red-600 hover:text-red-800" title="Удалить">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        rows += `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-3 font-mono text-xs">${index + 1}</td>
+                                <td class="px-6 py-3">${escapeHtml(acc.level || '—')}</td>
+                                <td class="px-6 py-3 font-semibold">${acc.price} ₽</td>
+                                <td class="px-6 py-3"><span class="status-badge ${statusColor}">${statusText}</span></td>
+                            </tr>
+                        `;
+                    }
+                });
+                tbody.innerHTML = rows;
+                updateStats();
+            }
+
+            window.markAsSold = async function(id) {
+                if (!isAdmin) return;
+                const account = accounts.find(a => a.id === id);
+                if (account && account.status !== 'sold') {
+                    account.status = 'sold';
+                    saveToLocal();
+                    await syncWithGitHub();
+                    renderTable();
+                }
+            };
+
+            window.deleteAccount = async function(id) {
+                if (!isAdmin) return;
+                if (confirm('Удалить аккаунт?')) {
+                    accounts = accounts.filter(a => a.id !== id);
+                    if (editingId === id) cancelEdit();
+                    saveToLocal();
+                    await syncWithGitHub();
+                    renderTable();
+                }
+            };
+
+            window.editAccount = function(id) {
+                if (!isAdmin) return;
+                const account = accounts.find(a => a.id === id);
+                if (!account) return;
+
+                editIdInput.value = account.id;
+                usernameInput.value = account.username || '';
+                passwordInput.value = account.password || '';
+                levelInput.value = account.level || '';
+                priceInput.value = account.price || '';
+                statusSelect.value = account.status || 'available';
+
+                editingId = id;
+                formTitle.textContent = 'Редактировать аккаунт';
+                submitBtn.innerHTML = '<i class="fas fa-pen"></i> Обновить';
+                cancelEditBtn.classList.remove('hidden');
+            };
+
+            function cancelEdit() {
+                editingId = null;
+                editIdInput.value = '';
+                form.reset();
+                formTitle.textContent = 'Добавить новый аккаунт';
+                submitBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить';
+                cancelEditBtn.classList.add('hidden');
+            }
+            window.cancelEdit = cancelEdit;
+
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                if (!isAdmin) return;
+
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+                const level = levelInput.value.trim();
+                const price = Number(priceInput.value);
+                const status = statusSelect.value;
+
+                if (!username || !password || !price || price < 0) {
+                    alert('Заполните логин, пароль и корректную цену');
+                    return;
+                }
+
+                if (editingId) {
+                    const index = accounts.findIndex(a => a.id === editingId);
+                    if (index !== -1) {
+                        accounts[index] = { ...accounts[index], username, password, level, price, status };
+                    }
+                } else {
+                    const newId = Date.now().toString() + Math.floor(Math.random()*1000);
+                    accounts.push({ id: newId, username, password, level, price, status });
+                }
+
+                saveToLocal();
+                await syncWithGitHub();
+                renderTable();
+                cancelEdit();
+            });
+
+            async function syncWithGitHub() {
+                if (!isAdmin || !githubToken || !githubRepo || !githubPath) return;
+                try {
+                    if (!currentSha) {
+                        const { sha } = await fetchFromGitHub(githubToken, githubRepo, githubPath);
+                        currentSha = sha;
+                    }
+                    await saveToGitHub(accounts, githubToken, githubRepo, githubPath, currentSha, 'Автообновление аккаунтов');
+                    console.log('Синхронизация с GitHub выполнена');
+                } catch (err) {
+                    console.error('Ошибка синхронизации с GitHub:', err);
+                    alert('Не удалось сохранить изменения на GitHub. Проверьте токен и репозиторий.');
+                }
+            }
+
+            async function connectGitHub() {
+                const token = tokenInput.value.trim();
+                const repo = repoInput.value.trim();
+                const path = pathInput.value.trim();
+                if (!token || !repo || !path) {
+                    githubError.textContent = 'Заполните все поля';
+                    githubError.classList.remove('hidden');
+                    return;
+                }
+
+                connectGitHubBtn.disabled = true;
+                connectGitHubBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Загрузка...';
+                githubError.classList.add('hidden');
+
+                try {
+                    const { accounts: remoteAccounts, sha } = await fetchFromGitHub(token, repo, path);
+                    accounts = remoteAccounts.map(a => ({ ...a, price: Number(a.price) }));
+                    saveToLocal();
+
+                    githubToken = token;
+                    githubRepo = repo;
+                    githubPath = path;
+                    currentSha = sha;
+
+                    sessionStorage.setItem('githubToken', token);
+                    sessionStorage.setItem('githubRepo', repo);
+                    sessionStorage.setItem('githubPath', path);
+                    sessionStorage.setItem('githubSha', sha);
+
+                    adminFormBlock.classList.remove('hidden');
+                    syncBlock.classList.remove('hidden');
+                    renderTable();
+                } catch (err) {
+                    githubError.textContent = 'Ошибка: ' + err.message;
+                    githubError.classList.remove('hidden');
+                } finally {
+                    connectGitHubBtn.disabled = false;
+                    connectGitHubBtn.innerHTML = '<i class="fas fa-plug"></i> Подключиться';
+                }
+            }
+
+            function openLoginModal() {
+                loginModal.classList.remove('hidden');
+                loginUsername.value = '';
+                loginPassword.value = '';
+                loginError.classList.add('hidden');
+            }
+
+            function closeLoginModalFunc() {
+                loginModal.classList.add('hidden');
+            }
+
+            function submitLoginHandler() {
+                const username = loginUsername.value.trim();
+                const password = loginPassword.value.trim();
+                if (username === ADMIN_LOGIN && password === ADMIN_PASSWORD) {
+                    isAdmin = true;
+                    adminIndicator.classList.remove('hidden');
+                    logoutBtn.classList.remove('hidden');
+                    loginBtn.classList.add('hidden');
+                    githubSetupBlock.classList.remove('hidden');
+                    toggleAdminStats(true);
+                    
+                    const savedToken = sessionStorage.getItem('githubToken');
+                    const savedRepo = sessionStorage.getItem('githubRepo');
+                    const savedPath = sessionStorage.getItem('githubPath');
+                    const savedSha = sessionStorage.getItem('githubSha');
+                    if (savedToken && savedRepo && savedPath) {
+                        githubToken = savedToken;
+                        githubRepo = savedRepo;
+                        githubPath = savedPath;
+                        currentSha = savedSha || '';
+                        tokenInput.value = savedToken;
+                        repoInput.value = savedRepo;
+                        pathInput.value = savedPath;
+                        connectGitHub();
+                    } else {
+                        loadFromLocal();
+                        renderTable();
+                    }
+                    closeLoginModalFunc();
+                } else {
+                    loginError.textContent = 'Неверный логин или пароль';
+                    loginError.classList.remove('hidden');
+                }
+            }
+
+            function logout() {
+                isAdmin = false;
+                githubToken = '';
+                githubRepo = '';
+                githubPath = '';
+                currentSha = '';
+                sessionStorage.clear();
+                adminIndicator.classList.add('hidden');
+                logoutBtn.classList.add('hidden');
+                loginBtn.classList.remove('hidden');
+                githubSetupBlock.classList.add('hidden');
+                adminFormBlock.classList.add('hidden');
+                syncBlock.classList.add('hidden');
+                toggleAdminStats(false);
+                loadFromLocal();
+                renderTable();
+                cancelEdit();
+            }
+
+            async function manualSync() {
+                if (!isAdmin) return;
+                try {
+                    const { accounts: remoteAccounts, sha } = await fetchFromGitHub(githubToken, githubRepo, githubPath);
+                    accounts = remoteAccounts.map(a => ({ ...a, price: Number(a.price) }));
+                    currentSha = sha;
+                    saveToLocal();
+                    renderTable();
+                    alert('Данные обновлены с GitHub');
+                } catch (err) {
+                    alert('Ошибка загрузки: ' + err.message);
+                }
+            }
+
+            loginBtn.addEventListener('click', openLoginModal);
+            closeLoginModal.addEventListener('click', closeLoginModalFunc);
+            submitLogin.addEventListener('click', submitLoginHandler);
+            window.addEventListener('click', (e) => {
+                if (e.target === loginModal) closeLoginModalFunc();
+            });
+
+            logoutBtn.addEventListener('click', logout);
+            connectGitHubBtn.addEventListener('click', connectGitHub);
+            syncBtn.addEventListener('click', manualSync);
+
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const filter = this.dataset.filter;
+                    currentFilter = filter;
+                    filterButtons.forEach(b => {
+                        if (b.dataset.filter === currentFilter) {
+                            b.classList.remove('bg-white', 'text-gray-700', 'border', 'hover:bg-gray-100');
+                            b.classList.add('bg-indigo-600', 'text-white', 'hover:bg-indigo-700');
+                        } else {
+                            b.classList.remove('bg-indigo-600', 'text-white', 'hover:bg-indigo-700');
+                            b.classList.add('bg-white', 'text-gray-700', 'border', 'hover:bg-gray-100');
+                        }
+                    });
+                    renderTable();
+                });
+            });
+
+            // Инициализация particles.js (светлый фон, тёмные частицы)
+            particlesJS('particles-js', {
+                particles: {
+                    number: { value: 80, density: { enable: true, value_area: 800 } },
+                    color: { value: '#2c3e50' }, // тёмно-серый/синий
+                    shape: { type: 'circle' },
+                    opacity: { value: 0.3, random: true },
+                    size: { value: 3, random: true },
+                    line_linked: { enable: true, distance: 150, color: '#2c3e50', opacity: 0.2, width: 1 },
+                    move: { enable: true, speed: 2, direction: 'none', random: true, straight: false, out_mode: 'out' }
+                },
+                interactivity: {
+                    detect_on: 'canvas',
+                    events: {
+                        onhover: { enable: true, mode: 'repulse' },
+                        onclick: { enable: true, mode: 'push' }
+                    }
+                },
+                retina_detect: true
+            });
+
+            function init() {
+                loadFromLocal();
+                renderTable();
+                toggleAdminStats(false);
+            }
+
+            init();
+        })();
+    </script>
+</body>
+</html>
