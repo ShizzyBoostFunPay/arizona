@@ -97,7 +97,7 @@
                 </div>
                 <div>
                     <label class="block text-gray-600 text-sm mb-1">Репозиторий</label>
-                    <input type="text" id="githubRepo" placeholder="user/repo" value="yourusername/arizona-accounts"
+                    <input type="text" id="githubRepo" placeholder="user/repo" value="ShizzyBoostFunPay/arizona"
                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200">
                 </div>
                 <div>
@@ -349,6 +349,7 @@
                 if (stored) {
                     try {
                         accounts = JSON.parse(stored);
+                        console.log('Загружено из localStorage:', accounts.length);
                     } catch (e) {
                         accounts = [...defaultAccounts];
                     }
@@ -360,16 +361,32 @@
 
             function saveToLocal() {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+                console.log('Сохранено в localStorage');
             }
 
-            // --- Публичная загрузка с GitHub (без токена) ---
+            // --- Публичная загрузка с GitHub через raw (без токена) ---
             async function fetchPublicFromGitHub(repo, path) {
-                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-                const response = await fetch(url); // без токена
-                if (!response.ok) throw new Error(`GitHub public error: ${response.status}`);
+                const [owner, repoName] = repo.split('/');
+                // Пробуем main
+                const urlMain = `https://raw.githubusercontent.com/${owner}/${repoName}/main/${path}`;
+                try {
+                    console.log('Пытаемся загрузить публично (main):', urlMain);
+                    const response = await fetch(urlMain);
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Успешно загружено с main');
+                        return data;
+                    }
+                } catch (e) { /* игнорируем */ }
+
+                // Пробуем master
+                const urlMaster = `https://raw.githubusercontent.com/${owner}/${repoName}/master/${path}`;
+                console.log('Пытаемся загрузить публично (master):', urlMaster);
+                const response = await fetch(urlMaster);
+                if (!response.ok) throw new Error('Файл не найден в main или master');
                 const data = await response.json();
-                const content = atob(data.content);
-                return JSON.parse(content);
+                console.log('Успешно загружено с master');
+                return data;
             }
 
             // --- Приватные функции с токеном ---
@@ -637,6 +654,7 @@
                         currentSha = sha;
                     }
                     await saveToGitHub(accounts, githubToken, githubRepo, githubPath, currentSha, 'Автообновление аккаунтов');
+                    console.log('Синхронизация с GitHub выполнена');
                 } catch (err) {
                     console.error('Ошибка синхронизации с GitHub:', err);
                     alert('Не удалось сохранить изменения на GitHub. Проверьте токен и репозиторий.');
@@ -707,12 +725,16 @@
             async function loadPublicFromGitHub() {
                 const repo = localStorage.getItem(REPO_KEY);
                 const path = localStorage.getItem(PATH_KEY);
-                if (!repo || !path) return false; // нет сохранённых параметров
+                if (!repo || !path) {
+                    console.log('Нет сохранённых параметров репозитория');
+                    return false;
+                }
 
                 try {
                     const publicAccounts = await fetchPublicFromGitHub(repo, path);
                     accounts = publicAccounts.map(a => ({ ...a, price: Number(a.price) }));
                     saveToLocal();
+                    console.log('Данные успешно загружены с GitHub (публично)');
                     return true;
                 } catch (err) {
                     console.log('Не удалось загрузить публично, используем localStorage', err);
